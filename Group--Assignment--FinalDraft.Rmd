@@ -1,0 +1,1000 @@
+---
+title: "Feminine intimate hygiene products: a comparison between supermarkets"
+author: "Mireia Hontanares Belda Cortés  & Mecki Hamed Guerrero"
+date: "2023-03-11"
+output: 
+distill::distill_article:
+  self_contained: false
+  tod: true
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. RESEARCH CONTEXT
+
+**Menstrual poverty**, characterized by economic difficulties preventing women from accessing menstrual products, either directly or indirectly, presents itself as a significant challenge in today's world, affecting millions of women worldwide. This phenomenon, widespread across numerous nations, is compounded by the persistence of taboos and stigmas surrounding menstruation, further intensifying its effects on different communities.
+
+All of this carries repercussions that significantly impact both the physical and mental health of menstruating women. Practices such as overutilization or even non-use of menstrual products can lead to vaginal and urinary tract infections, thereby adversely affecting self-esteem and fostering the development of various psychological disorders such as anxiety.
+
+Recent statistics indicate that **two out of every 10 women** in Spain experience menstrual poverty, often forcing them to make difficult decisions between purchasing menstrual products or allocating their resources to basic needs like food. This situation is exacerbated by widespread price increases resulting from recent inflation, leading to these products being relegated on the priority list of purchases compared to other essential items (Molina Gallardo, 2021).
+
+This scenario has sparked a debate about the necessity not only for **public funding** of these products but also for the r**eduction of value-added tax** (VAT) applied to them (recently reduced from 10% to 4%).
+
+Therefore, this study aims to conduct a **comparative analysis** between two major Spanish supermarkets, **DIA** and **Alcampo**, regarding their offerings of menstrual products, specifically pads and tampons. The objective is to gather data from these establishments through scraping, in order to identify relevant information on prices, quantities, and varieties of female products. This will enable a detailed comparison to determine which supermarket is more cost-effective for purchasing. Considerations will include:
+
+-   **Type of product** (pad/tampon)
+
+-   **Price**
+
+-   **Brand**
+
+-   **Description**
+
+-   **Quantity** (units)
+
+While this study focuses on the two main Spanish supermarkets, DIA and Alcampo, there is potential to broaden the scope to include more establishments, aiming for a comprehensive comparison. This expansion would make it easier for menstruating women to access more affordable menstrual products.
+
+# 2. INSTRUCTIONS
+
+To run the code correctly, the following libraries must be **installed**:
+
+-   install.packages("xml2")
+
+-   install.packages("httr")
+
+-   install.packages("tidyverse")
+
+-   install.packages("sf")
+
+-   install.packages("rnaturalearth")
+
+-   install.packages("scrapex")
+
+-   install.packages("tm")
+
+-   install.packages("stringr")
+
+-   install.packages("ggplot2")
+
+-   install.packages("viridis")
+
+-   install.packages("plotly")
+
+# 2. SCRAPPING
+
+## FIRST STEP: LOAD LIBRARIES
+
+The first step to carry out this analysis is to load all the necessary libraries.
+
+```{r, warning=FALSE, message=FALSE}
+
+# Load libraries
+
+library(xml2)
+library(httr)
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+library(scrapex)
+library(tm)
+library(stringr)
+library(ggplot2)
+library(viridis)
+library(plotly)
+
+```
+
+## SECOND STEP: SUPERMARKET WEB.
+
+The second step, once all the necessary libraries have been loaded, is to access the websites of both supermarkets that will be analyzed. This will allow access to the **URL links** from which the desired information will be extracted. In this case, we will use the websites of **DIA** (www.DIA.es) and **Alcampo** (www.alcampo.es).
+
+Both websites allow for online shopping, with a wide catalog of all their products from which to access those that interest us.
+
+## 2.1. DIA
+
+The first URL links to be used will be those related to the **pads** and **tampons** offered on the DIA website:
+
+```{r}
+compresas_DIA <- "https://www.dia.es/search?q=compresas" 
+tampones_DIA <- "https://www.dia.es/search?q=tampones"
+```
+
+Once we access the HTML of each of the products, we select the first child of the root node and assign these objects to the corresponding variables.
+
+```{r}
+compresas_DIA_HTML <- read_html(compresas_DIA) |> xml_child()
+tampones_DIA_HTML <- read_html(tampones_DIA) |> xml_child()
+
+compresas_DIA_HTML
+tampones_DIA_HTML
+```
+
+### 2.2.1. DIA. INFORMATION
+
+Faced with this result, we attend to the development panel from the website in order to access the information we need more directly, gradually testing until we reach what we want.
+
+First, we search for all elements where the names of the pad products are located on the website page, subsequently extracting the text contained within these elements.
+
+**PADS:**
+
+```{r}
+Compresas_INFO <- compresas_DIA_HTML |> 
+  xml_find_all("//p[@class='search-product-card__product-name']") |> 
+  xml_text()|> 
+  str_extract_all(".+")
+
+Compresas_INFO
+```
+
+However, we notice that products that are not pads (such as panty liners and menstrual panties) are being extracted, so we proceed to extract them as a vector instead of a list:
+
+```{r}
+
+Compresas_INFO <- compresas_DIA_HTML |> 
+  xml_find_all("//p[@class='search-product-card__product-name']") |> 
+  xml_text() |> 
+  str_extract_all(".+") |> 
+  unlist()  # list into vector
+
+Compresas_INFO
+
+
+```
+
+Once we obtain the vector, we remove those numbers that we do not want to extract and then convert it back to a list:
+
+```{r}
+# We create a vector with the numbers that we want to aliminate and we apply it
+
+indices_a_eliminar <- c(16, 20, 21, 22, 25)
+
+Compresas_INFO <- Compresas_INFO[-indices_a_eliminar]
+
+Compresas_INFO <- as.list(Compresas_INFO)
+
+Compresas_INFO
+```
+
+**TAMPONS:**
+
+Now we perform the previous steps but with the tampons instead of the pads. In this case, we do not encounter the previous error, so we only extract the elements where the tampon products are located on the website page:
+
+```{r}
+
+Tampones_INFO <- tampones_DIA_HTML |> 
+  xml_find_all("//p[@class='search-product-card__product-name']") |> 
+  xml_text()|> 
+  str_extract_all(".+")
+
+Tampones_INFO
+
+```
+
+It is important to highlight the crucial role of regular expressions (regex) in this entire process. Regular expressions allow us to specify patterns of text that we are searching for in the HTML of web pages. By using regex, we can adapt to different variations in the text structure and attempt to find the logic that best fits each specific case.
+
+In this context, regular expressions provide us with the necessary flexibility to identify and extract specific information accurately and efficiently. For example, when searching for the names of pad or tampon products, they also facilitate the filtering of unwanted results.
+
+### 2.2.2. DIA. PRICE
+
+**PADS:**
+
+The next step, given the objectives outlined, is to extract the price of each of the products, both pads and tampons, for the DIA supermarket. In this case, we encounter again the intrusion of products that are not exactly pads, so we proceed to remove them once more:
+
+```{r}
+
+Compresas_Precio <- compresas_DIA_HTML |> 
+  xml_find_all("//p[@data-test-id='search-product-card-unit-price' and @class='search-product-card__active-price']") |> 
+  xml_text() |> 
+  str_extract_all("[0-9,]+") |>
+  lapply(function(x) as.numeric(gsub(",", ".", x)))
+
+Compresas_Precio <- Compresas_Precio[-indices_a_eliminar]
+
+Compresas_Precio <- as.list(Compresas_Precio)
+
+Compresas_Precio
+
+```
+
+**TAMPONS:**
+
+We do the same with the tampons, but without removing the indexs:
+
+```{r}
+Tampones_Precio <- tampones_DIA_HTML |> 
+  xml_find_all("//p[@data-test-id='search-product-card-unit-price' and @class='search-product-card__active-price']") |> 
+  xml_text() |> 
+  str_extract_all("[0-9,]+") |>
+  lapply(function(x) as.numeric(gsub(",", ".", x)))
+
+Tampones_Precio <- as.list(Tampones_Precio)
+
+Tampones_Precio
+
+```
+
+This way, we obtain a list with the prices of pads and tampons from the DIA supermarket, allowing us to compare which of these products are more cost-effective.
+
+### 2.2.3. DIA. BRAND
+
+Similarly to the previous case, we use regular expressions to extract all words that appear to be brands of sanitary pads. To do this, by observing the website itself, we notice that all brands start with an uppercase letter, followed by one or more lowercase letters, and occasionally followed by a second word that begins with an uppercase letter and is followed by lowercase letters.
+
+**PADS:**
+
+The idea when selecting the brands is to extract those words that start with an uppercase letter. However, this process would lead to the extraction of the word "Compresas". Since it has been specified that the processed information comes from sanitary pads, including this word would be redundant. Therefore, we will replace each occurrence of "Compresas" with an empty string.
+
+```{r}
+
+Compresas_Marca <- Compresas_INFO |> 
+  str_extract_all("\\b[A-Z][a-zá-ú]+(?:\\s[A-Z][a-zá-ú]+)?\\b") |> 
+  sapply(paste, collapse=" ") |>
+  str_replace_all("\\bCompresas \\b", "")
+
+Compresas_Marca <- as.list(Compresas_Marca)
+
+Compresas_Marca
+
+```
+
+**TAMPONS:**
+
+We do the same with the tampons. Similarly, the extraction in this case would result in the word "Tampones" being included. Since this is unnecessary, we again replace this word with an empty string.
+
+```{r}
+
+
+Tampones_Marca <- Tampones_INFO |> 
+  str_extract_all("\\b[A-Z][a-z]+(?:\\s[A-Z][a-z]+)?\\b|\\bo\\.[A-Za-z.]+") |> 
+  sapply(paste, collapse=" ") |>
+  str_replace_all("\\bTampones\\b", "") |>
+  str_trim()
+
+Tampones_Marca <- as.list(Tampones_Marca)
+
+Tampones_Marca
+
+```
+
+### 2.2.3. DIA. DESCRIPTION
+
+Now we will focus on the **product description**. This aspect provides us with additional information about each product, which will enrich the final analysis regarding the quality, price, and quantity of tampons and pads. By obtaining more specific details about each product, such as its size, additional features, or potential benefits, we will be able to better assess its suitability and value compared to other products available in the market.
+
+**PADS:**
+
+In this case, we understand "descripcion" to be everything that is not the brand, the number of units, or the word "Compresas". Therefore, the extraction will consist of all words containing lowercase letters, numbers, and the letter "ú", as this letter is included in the word "súper".
+
+```{r}
+
+Descripcion1 <- Compresas_INFO |>
+   str_extract_all("\\b[a-z0-9ú]+\\b") |>
+  sapply(paste, collapse=" ")
+
+Descripcion1 <- as.list(Descripcion1)
+
+Descripcion1
+
+```
+
+From this information, we can perform two more extractions: One that ignores the quantity, which would give us the product description, and another that ignores the description, allowing us to extract the quantity. For the first extraction, we will remove any characters that come after the words "bolsa" (bag) and "caja" (box). Similarly, we remove any occurrences of "de" (of) and "esos" (those) to obtain a cleaner result. The outcome will be what we consider as the "description," in this case, of the sanitary pads.
+
+```{r}
+
+# we eliminate everything thats after the word  "bolsa"
+
+Compresas_Descripcion <- Descripcion1 |>
+  str_remove_all("bolsa.*")
+
+# we eliminate everything thats after the word "caja"
+
+Compresas_Descripcion <- Compresas_Descripcion |>
+  str_remove_all("caja.*")
+
+# eliminate "de" and "esos" 
+
+Compresas_Descripcion <- Compresas_Descripcion |>
+  str_remove_all("\\b(de|esos)\\b")
+
+# eliminate the spaces 
+
+Compresas_Descripcion <- Compresas_Descripcion |>
+  str_trim()
+
+Compresas_Descripcion <- as.list(Compresas_Descripcion)
+
+Compresas_Descripcion
+
+
+```
+
+**TAMPONS:**
+
+We repeat the process for tampons: First, we select only those words that have all their letters in lowercase. Similarly, we remove all information related to quantity, as well as "o b," as this information would correspond to the brand.
+
+```{r}
+Descripcion2 <- Tampones_INFO |>
+   str_extract_all("\\b[a-z0-9ú]+\\b") |>
+  sapply(paste, collapse=" ")
+
+Descripcion2 <- as.list(Descripcion2)
+
+Descripcion2
+```
+
+```{r}
+
+# eliminate everything thats after the word "caja":
+
+
+Tampones_Descripcion <- Descripcion2 |>
+  str_remove_all("caja.*") |>
+  str_remove_all("\\bo\\s.*") |>
+  str_trim()
+
+Tampones_Descripcion <- as.list(Tampones_Descripcion)
+
+Tampones_Descripcion
+```
+
+### 2.2.3. DIA. QUANTITY
+
+The next step is to examine the **quantity** of pads and tampons included in each of the products. This will be crucial to determine which one will be more cost-effective based on its price and quantity, as sometimes we are swayed by the overall price without considering the price per unit. Understanding the quantity provided with each purchase allows for a more informed comparison, ensuring that we are making a value-driven decision rather than solely focusing on the upfront cost.
+
+**PADS:**
+
+At the code level, the quantity can be obtained through the descriptions of both products. The idea is to perform an extraction that finds the words "bolsa" and "caja" and extracts them along with everything that comes after these terms. From here, we will obtain both a brief description of the quantity and the exact units.
+
+```{r}
+
+Compresas_Cantidad <- Descripcion1 |>
+  str_extract("(bolsa|caja) .*")
+
+Compresas_Cantidad <- as.list(Compresas_Cantidad)
+
+Compresas_Cantidad_Unidades <- Compresas_Cantidad |>
+  str_extract("\\b\\d+\\b")
+
+Compresas_Cantidad_Unidades <- as.list(Compresas_Cantidad_Unidades)
+
+Compresas_Cantidad_Unidades
+```
+
+**TAMPONS:**
+
+We repeat the process for tampons. In this case, the key word is "caja", so we will proceed to find it and extract everything that comes after it, including the word itself. Similarly, we extract only the numbers to obtain the units.
+
+```{r}
+
+Tampones_Cantidad <- Descripcion2 |>
+  str_extract("caja.*")
+
+Tampones_Cantidad_Unidades <- Descripcion2 |>
+  str_extract("\\b\\d+\\b")
+
+
+Tampones_Cantidad <- as.list(Tampones_Cantidad)
+
+Tapones_Cantidad_Unidades <- as.list(Tampones_Cantidad_Unidades)
+
+Tapones_Cantidad_Unidades
+
+
+
+```
+
+### 2.2.4. DIA. DATA FRAME
+
+To carry out the comparison effectively, it is essential to consolidate all the previously obtained data into a single **data frame**, which will allow us to access the information in a coherent and understandable manner. By combining the data of brands, prices, quantities, and descriptions into a single data frame, we will be able to conduct **comparative analyses** more efficiently and draw meaningful inferences about the differences and similarities between the pads and tampons offered in the supermarket.
+
+To do this, the first step is to "**flatten**" those nested lists (i.e., lists containing other lists), turning them into a single list. This will allow us to convert the data into a simpler and more suitable format for subsequent processing. Once we have flattered the nested lists, we create the data frame for both products: pads and tampons.
+
+**PADS:**
+
+```{r}
+
+
+# "Flattening" the nested lists before creating the pads data frame:
+
+Compresas_Marca_df <- unlist(Compresas_Marca)
+Compresas_Cantidad_Unidades_df <- unlist(Compresas_Cantidad_Unidades)
+Compresas_Precio_df <- unlist(Compresas_Precio)
+Compresas_Descripcion_df <- unlist(Compresas_Descripcion)
+
+
+# Creation of the pads dataframe:
+
+
+df_Compresas <- data.frame(Marca = Compresas_Marca_df,
+                    Unidades = Compresas_Cantidad_Unidades_df,
+                    Precio = Compresas_Precio_df,
+                    Descripcion = Compresas_Descripcion_df)
+
+df_Compresas
+
+view(df_Compresas)
+
+```
+
+**TAMPONS:**
+
+And now, with tampons:
+
+```{r}
+
+# "Flattening" the nested lists before creating the data frame for tampons:
+
+Tampones_Marca_df <- unlist(Tampones_Marca)
+Tampones_Cantidad_Unidades_df <- unlist(Tampones_Cantidad_Unidades)
+Tampones_Precio_df <- unlist(Tampones_Precio)
+Tampones_Descripcion_df <- unlist(Tampones_Descripcion)
+
+
+# Creation of the tampons dataframe:
+
+df_Tampones <- data.frame(Marca = Tampones_Marca_df,
+                    Unidades = Tampones_Cantidad_Unidades_df,
+                    Precio = Tampones_Precio_df,
+                    Descripcion = Tampones_Descripcion_df)
+
+df_Tampones
+
+view(df_Tampones)
+```
+
+## 3. ALCAMPO
+
+Once we have completed the analysis of menstrual products offered by DIA, it's time to conduct a similar analysis with Alcampo's products. The goal is to determine if there are **significant differences** between both supermarkets in terms of product variety and prices.
+
+While many of the previous steps may serve as a guide for this part of the analysis, it's important to note that each website may have specific peculiarities that require different approaches to access the desired information. Therefore, we must be prepared to adjust our methodology as necessary to gather accurate and comprehensive data from Alcampo.
+
+The first step, as done previously, is to access the **Alcampo website.**
+
+```{r}
+
+compresas_ALC <- "https://www.compraonline.alcampo.es/search?q=compresas" 
+tampones_ALC <- "https://www.compraonline.alcampo.es/search?q=tampones"
+
+```
+
+```{r}
+
+compresas_ALC_HTML <- read_html(compresas_ALC) |> xml_child()
+tampones_ALC_HTML <- read_html(tampones_ALC) |> xml_child()
+
+compresas_ALC_HTML
+tampones_ALC_HTML
+
+```
+
+Once we add the link to R, we proceed to search for the part of the HTML where the information we intend to access is located.
+
+### 3.1.1. ALCAMPO. INFORMATION
+
+After inspecting the code through the website, we obtain the code that will provide us with all the necessary information to proceed.
+
+**PADS:**
+
+```{r}
+Compresas_ALC_INFO <- compresas_ALC_HTML |>
+    xml_find_all("//h3[@class='_text_f6lbl_1 _text--m_f6lbl_23']") |> 
+  xml_text() |> 
+  str_extract_all(".+")
+
+Compresas_ALC_INFO
+
+```
+
+**TAMPONS:**
+
+We repeat the process for tampons. In this case, we can verify that the first extraction returns at least 2 values that belong to "Menstrual Cups" and not to "Tampons," so we will proceed to remove them once extracted.
+
+```{r}
+Tampones_ALC_INFO <- tampones_ALC_HTML |>
+    xml_find_all("//h3[@class='_text_f6lbl_1 _text--m_f6lbl_23']") |> 
+  xml_text() |> 
+  str_extract_all(".+")
+
+indices_a_eliminar_2 <- c(27, 28)
+
+Tampones_ALC_INFO <- Tampones_ALC_INFO[-indices_a_eliminar_2]
+
+Tampones_ALC_INFO
+```
+
+As happened with the extractions carried out for the DIA Supermarket, we can verify that all the information we will work with is in this first extraction. Therefore, before proceeding, we will search in the HTML for the line of code that allows us to access the price. Once we obtain this information, we will start the processing.
+
+### 3.1.2. ALCAMPO. PRICE
+
+**PADS:**
+
+We repeat the same process to obtain the price, this time for "Compresas".
+
+```{r}
+Compresas_ALC_Precio <- compresas_ALC_HTML |>       
+  xml_find_all("//span[@class='_text_f6lbl_1 _text--m_f6lbl_23 price__PriceText-sc-1nlvmq9-0 BCfDm']") |>   
+  xml_text() |>       
+  str_extract_all("[0-9,]+") |>      
+  lapply(function(x) as.numeric(gsub(",", ".", x)))   
+
+Compresas_ALC_Precio <- as.list(Compresas_ALC_Precio)    
+
+Compresas_ALC_Precio 
+```
+
+**TAMPONS:**
+
+We repeat it for tampons:
+
+```{r}
+Tampones_ALC_Precio <- tampones_ALC_HTML |>       
+  xml_find_all("//span[@class='_text_f6lbl_1 _text--m_f6lbl_23 price__PriceText-sc-1nlvmq9-0 BCfDm']") |>       
+  xml_text() |>       
+  str_extract_all("[0-9,]+") |>      
+  lapply(function(x) as.numeric(gsub(",", ".", x)))    
+
+Tampones_ALC_Precio <- Tampones_ALC_Precio[-indices_a_eliminar_2]  
+
+Tampones_ALC_Precio <- as.list(Tampones_ALC_Precio)    
+
+Tampones_ALC_Precio
+```
+
+### 3.1.3. ALCAMPO. BRAND
+
+For the brand extraction, we will use the first extraction, as we did previously. In this case, brands are the only words entirely in uppercase, so we will extract them based on this characteristic.
+
+However, we noticed that the first extraction returns the brand name twice, which is not desirable. Therefore, we will apply a filter to keep only one of the words. Additionally, we will adjust the code to exclude the word "PRODUCTO".
+
+**PADS:**
+
+```{r}
+Compresas_ALC_Marca <- Compresas_ALC_INFO |>
+  str_extract_all("\\b[A-Z]+\\b")
+
+
+Compresas_ALC_Marca <- lapply(Compresas_ALC_Marca, function(inner_list) {
+  unique(Filter(function(word) grepl("\\b[AEM][A-Za-z]*\\b", word), inner_list))
+})
+
+Compresas_ALC_Marca <- as.list(Compresas_ALC_Marca)
+
+Compresas_ALC_Marca
+```
+
+**TAMPONS:**
+
+For tampons, the procedure is similar, except for the inclusion of the "Ó" in the extraction, as the word "ECOLÓGICO" is relevant brand information for us.
+
+```{r}
+Tampones_ALC_Marca <- Tampones_ALC_INFO |>
+  str_extract_all("\\b[A-ZÁÉÍÓÚÜ]+\\b")
+
+
+Tampones_ALC_Marca <- lapply(Tampones_ALC_Marca, function(inner_list) {
+  unique(Filter(function(word) grepl("\\b[AOTEBSIFÁÉÍÓÚÜ][A-Za-zÁÉÍÓÚÜ]*\\b", word), inner_list))
+})  |>
+  sapply(paste, collapse = " ")
+
+
+Tampones_ALC_Marca <- as.list(Tampones_ALC_Marca)
+
+Tampones_ALC_Marca
+```
+
+### 3.1.4. ALCAMPO. DESCRIPTION
+
+**PADS:**
+
+Next, we will proceed to obtain the description of the "Compresas" from the ALCAMPO Supermarket through a process similar to the one used for the DIA Supermarket. To do this, we will need to extract information from the initial data, excluding both the quantity and the brand. It's important to note the presence of the word "uds" for which we will perform a specific operation to remove it.
+
+```{r}
+
+Descripcion_alc_1 <- Compresas_ALC_INFO |>
+   str_extract_all("\\b[a-z]+\\b") |>
+   sapply(paste, collapse = " ")
+
+Descripcion_alc_1 <- as.list(Descripcion_alc_1)
+
+
+Descripcion_alc_1 <- Descripcion_alc_1 |>
+   str_extract_all("\\b(?!uds\\b)[a-z]+\\b") |>
+   sapply(paste, collapse = " ")
+
+Descripcion_alc_1 <- as.list(Descripcion_alc_1)
+
+Compresas_ALC_Descripcion <- Descripcion_alc_1
+
+Compresas_ALC_Descripcion
+
+```
+
+**TAMPONS:**
+
+We repeat the process for the "Tampones". In this case, we must first consider the presence of words that start with a capital letter and are of interest for extraction. These words start with "T", "N", "M", and "S", so we need to ensure the extraction of these words using the appropriate code. Once we extract these words and remove the unnecessary ones, we can easily access the description of the "Tampons" from the ALCAMPO Supermarket.
+
+```{r}
+Descripcion_alc_2 <- Tampones_ALC_INFO |>
+  str_extract_all("\\b[A-Za-z][a-z]*\\b") |>
+  sapply(paste, collapse = " ")
+
+Descripcion_alc_2 <- as.list(Descripcion_alc_2)
+
+
+Descripcion_alc_2 <- Descripcion_alc_2 |>
+  str_replace_all("\\b(Tampon|Tampones|de)\\b", "")
+
+Descripcion_alc_2 <- as.list(Descripcion_alc_2)
+
+
+Descripcion_alc_2 <- Descripcion_alc_2 |>
+  str_extract_all("\\b[TNMSa-z][a-z]*\\b") |>
+  sapply(paste, collapse = " ") |>
+  str_replace_all("\\buds\\b", "") |>
+  str_trim()
+
+Descripcion_alc_2 <- as.list(Descripcion_alc_2)
+
+Tampones_ALC_Descripcion <- Descripcion_alc_2
+
+Tampones_ALC_Descripcion
+```
+
+### 3.1.5. ALCAMPO. QUANTITY
+
+Once again, to obtain the quantity, we perform an extraction on the initial information. In this case, this extraction will consist of obtaining the numbers present in the text, as well as the word "uds" (units). We will save this information and filter it to obtain only the figures in order to work more effectively with numerical data.
+
+**PADS:**
+
+```{r}
+
+Compresas_ALC_Cantidad <- Compresas_ALC_INFO |>
+  str_extract_all("\\b(\\d+)\\s*uds\\b") |>
+  sapply(paste, collapse = " ")
+
+Compresas_ALC_Cantidad <- as.list(Compresas_ALC_Cantidad)
+
+Compresas_ALC_Cantidad_Unidades <- Compresas_ALC_Cantidad |>
+  str_extract("(\\d+)")
+
+Compresas_ALC_Cantidad_Unidades <- as.list(Compresas_ALC_Cantidad_Unidades)
+
+Compresas_ALC_Cantidad_Unidades
+```
+
+**TAMPONS:**
+
+For "Tampons," we simplify the process and access only the numbers.
+
+```{r}
+
+
+Tampones_ALC_Cantidad <- Tampones_ALC_INFO |>
+  str_extract_all("\\b\\d+\\b") |>
+  sapply(paste, collapse = " ")
+
+
+Tampones_ALC_Cantidad_Unidades <- as.list(Tampones_ALC_Cantidad)
+
+Tampones_ALC_Cantidad_Unidades
+
+
+```
+
+### 3.1.6. ALCAMPO. DATA FRAME
+
+As we have done in the case of DIA, the final step is to create a dataframe for all the information related to each product. To do this, we will first flatten the nested lists and then create the corresponding dataframe.
+
+**PADS:**
+
+```{r}
+
+# "Flattening" the nested lists before creating the pads data frame:
+
+Compresas_ALC_Marca_df <- unlist(Compresas_ALC_Marca)
+Compresas_ALC_Cantidad_Unidades_df <- unlist(Compresas_ALC_Cantidad_Unidades)
+Compresas_ALC_Precio_df <- unlist(Compresas_ALC_Precio)
+Compresas_ALC_Descripcion_df <- unlist(Compresas_ALC_Descripcion)
+
+
+# Creation of the pads dataframe:
+
+df_Compresas_ALC <- data.frame(Marca = Compresas_ALC_Marca_df,
+                    Unidades = Compresas_ALC_Cantidad_Unidades_df,
+                    Precio = Compresas_ALC_Precio_df,
+                    Descripcion = Compresas_ALC_Descripcion_df)
+
+
+
+df_Compresas_ALC
+
+view(df_Compresas_ALC)
+
+
+```
+
+**TAMPONS:**
+
+```{r}
+
+# "Flattening" the nested lists before creating the tampons data frame:
+
+Tampones_ALC_Marca_df <- unlist(Tampones_ALC_Marca)
+Tampones_ALC_Cantidad_Unidades_df <- unlist(Tampones_ALC_Cantidad_Unidades)
+Tampones_ALC_Precio_df <- unlist(Tampones_ALC_Precio)
+Tampones_ALC_Descripcion_df <- unlist(Tampones_ALC_Descripcion)
+
+
+# Creation of the tampons dataframe:
+
+df_Tampones_ALC <- data.frame(Marca = Tampones_ALC_Marca_df,
+                    Unidades = Tampones_ALC_Cantidad_Unidades_df,
+                    Precio = Tampones_ALC_Precio_df,
+                    Descripcion = Tampones_ALC_Descripcion_df)
+
+
+
+df_Tampones_ALC
+
+view(df_Tampones_ALC)
+
+```
+
+# 3. ANALYSIS 
+
+## 3.1. DATA CLEANING
+
+### 3.1.1.PADS
+
+In order to carry out an effective comparison between both supermarkets, it is essential to clean the database created to facilitate calculations and comparisons.
+
+Firstly, we will conduct filtering on **DIA** to only consider menstrual pads, excluding incontinence pads. Although the latter are also considered feminine hygiene products, they are not directly associated with menstruation. Therefore, we have deemed it preferable to exclude them from the analysis, focusing primarily on menstrual products. This cleaning process will ensure that our results are more accurate and relevant for the supermarket comparison.
+
+```{r}
+df_Compresas_filtrado <- df_Compresas |>
+  filter(!grepl("incontinencia", Descripcion, ignore.case = TRUE))
+```
+
+Once this is done, and in order to distinguish the prices between those own brands (such as Evax, Ausonia, etc.) and the store brands, we added a column specifying the type of brand for each product. Similarly, we attempted to categorize between those with "wings" and "wingless" and between those that are of "regular" and "super" absorption. In this case, we included nighttime pads within the "super" category. Although nighttime pads also have their own absorption intensity scale, it is assumed that they are more absorbent than regular ones, hence classified as "super".
+
+```{r}
+
+# White brands
+df_Compresas_filtrado$Tipo_Marca<- ifelse(grepl("Esos Dias", df_Compresas_filtrado$Marca, ignore.case = TRUE), "White Brand", "Brand")
+
+
+# Distinguish between " con alas" and "sin alas"
+df_Compresas_filtrado$Alas <- ifelse(grepl("con alas", df_Compresas_filtrado$Descripcion, ignore.case = TRUE), "Con Alas", "Sin Alas")
+
+# Distinguish between "super" and "normal"
+
+df_Compresas_filtrado$Tipo <- ifelse(grepl("super|súper|noche", df_Compresas_filtrado$Descripcion, ignore.case = TRUE), "Super",
+                            ifelse(grepl("normal", df_Compresas_filtrado$Descripcion, ignore.case = TRUE), "Normal", NA))
+
+
+
+```
+
+We have also added a column to calculate the price per unit of pad. This addition will provide us with a more realistic perspective of the price when comparing. To perform this calculation, we first converted the "Units" column from character to numeric, as it was in text format.
+
+```{r}
+
+# Price per unit
+
+str(df_Compresas_filtrado) # we see that the Units column is a character type
+
+df_Compresas_filtrado$Unidades <- as.numeric(as.character(df_Compresas_filtrado$Unidades)) # change it into numeric
+
+df_Compresas_filtrado$Precio_por_unidad <- round (df_Compresas_filtrado$Precio / df_Compresas_filtrado$Unidades, digits = 2)
+```
+
+Now we delve into the analysis of the sanitary pads offered at **Alcampo.** Unlike DIA, the website of this supermarket does not feature incontinence pads, so there's no need to remove these entries. However, it does include postpartum pads, which we will exclude from the final dataframe to maintain consistency in our comparison.
+
+```{r}
+# Excluir la marca "Maternity" del dataframe
+df_Compresas_ALC_filtrado <- df_Compresas_ALC
+df_Compresas_ALC_filtrado  <- subset(df_Compresas_ALC_filtrado , Marca != "MATERNITY")
+
+```
+
+Once the cases of incontinence pads have been removed, we follow the same steps as in the previous case:
+
+```{r}
+
+# White brands
+
+df_Compresas_ALC_filtrado $Tipo_Marca<- ifelse(grepl("ALCAMPO", df_Compresas_ALC_filtrado $Marca, ignore.case = TRUE), "White Brand", "Brand")
+
+
+# Distinguish "con alas" and "sin alas"
+df_Compresas_ALC_filtrado$Alas <- ifelse(grepl("con alas", df_Compresas_ALC_filtrado$Descripcion, ignore.case = TRUE), "Con alas",
+                                  ifelse(grepl("sin alas", df_Compresas_ALC_filtrado$Descripcion, ignore.case = TRUE), "Sin alas", NA))
+
+
+
+# Distinguish between "super" and "normal"
+
+df_Compresas_ALC_filtrado$Tipo <- ifelse(grepl("super|súper|noche|maxi", df_Compresas_ALC_filtrado$Descripcion, ignore.case = TRUE), "Super",
+                            ifelse(grepl("normal|regular", df_Compresas_ALC_filtrado$Descripcion, ignore.case = TRUE), "Normal", NA))
+
+
+```
+
+And we also add the price per unit:
+
+```{r}
+
+# Price per unit
+
+str(df_Compresas_ALC_filtrado) # we see that the Units column is a character type
+
+df_Compresas_ALC_filtrado$Unidades <- as.numeric(as.character(df_Compresas_ALC_filtrado$Unidades)) # change it into numeric
+
+df_Compresas_ALC_filtrado$Precio_por_unidad <- round (df_Compresas_ALC_filtrado$Precio / df_Compresas_ALC_filtrado$Unidades, digits = 2)
+```
+
+Once we have both tables for both supermarkets, we merge them into a **single dataframe**. This facilitates the comparison and analysis of pad prices between the two supermarkets. By consolidating all the information into a single dataframe, we can visualize and analyze prices, brands, and product characteristics more efficiently and clearly.
+
+```{r}
+df_Compresas_ALC_filtrado$Supermercado <- "Alcampo"
+df_Compresas_filtrado$Supermercado <- "DIA"
+
+# Combinar los dataframes en uno solo
+df_combinado_compresas <- bind_rows(df_Compresas_ALC_filtrado, df_Compresas_filtrado)
+```
+
+To facilitate analysis, we change the order and remove the description since we have categorized different characteristics of the pads based on it.
+
+```{r}
+
+
+# New order
+order_columns_compresas <- c("Supermercado", "Marca", "Tipo_Marca", "Unidades","Precio", "Precio_por_unidad", "Alas", "Tipo")
+
+# Select columns
+df_combinado_compresas <- select(df_combinado_compresas, order_columns_compresas)
+df_combinado_compresas
+
+```
+
+### 3.1.2.TAMPONS
+
+Now, we'll take similar steps for tampons from both supermarkets. Let's start with **DIA**. First, we'll create a new column to specify whether they are store brands or name brands. Once we've done that, we'll add another column specifying the type of tampon: regular or super.
+
+```{r}
+
+# White brands
+
+df_Tampones_Filtrado <- df_Tampones
+
+df_Tampones_Filtrado$Tipo_Marca<- ifelse(grepl("Esos Dias", df_Tampones_Filtrado $Marca, ignore.case = TRUE), "White Brand", "Brand")
+
+
+
+# Distinguish between "super" and "normal"
+
+df_Tampones_Filtrado$Tipo <- ifelse(grepl("super|súper", df_Tampones_Filtrado$Descripcion, ignore.case = TRUE), "Super",
+                            ifelse(grepl("regular| Regulares| normal", df_Tampones_Filtrado$Descripcion, ignore.case = TRUE), "Normal", NA))
+
+
+
+```
+
+Once this is done, we'll calculate the price per unit for each tampon and add it as a new column.
+
+```{r}
+str(df_Tampones_Filtrado) # we see that the Units column is a character type
+
+df_Tampones_Filtrado$Unidades <- as.numeric(as.character(df_Tampones_Filtrado$Unidades)) # change it into numeric
+
+df_Tampones_Filtrado$Precio_por_unidad <- round (df_Tampones_Filtrado$Precio / df_Tampones_Filtrado$Unidades, digits = 2)
+```
+
+Now we do the same but with the tampons from **Alcampo**:
+
+```{r}
+
+# White brands
+
+df_Tampones_Filtrado_ALC <- df_Tampones_ALC
+
+df_Tampones_Filtrado_ALC$Tipo_Marca<- ifelse(grepl("ALCAMPO", df_Tampones_Filtrado_ALC $Marca, ignore.case = TRUE), "White Brand", "Brand")
+
+
+
+# Distinguish between "super" and "normal"
+
+df_Tampones_Filtrado_ALC$Tipo <- ifelse(grepl("super|súper", df_Tampones_Filtrado_ALC$Descripcion, ignore.case = TRUE), "Super",
+                            ifelse(grepl("regular| Regulares| normal", df_Tampones_Filtrado_ALC$Descripcion, ignore.case = TRUE), "Normal", NA))
+
+```
+
+We calculate the **price per unit** for each tampon and add it as a new column:
+
+```{r}
+
+str(df_Tampones_Filtrado_ALC) # we see that the Units column is a character type
+
+df_Tampones_Filtrado_ALC$Unidades <- as.numeric(as.character(df_Tampones_Filtrado_ALC$Unidades)) # change it into numeric
+
+df_Tampones_Filtrado_ALC$Precio_por_unidad <- round (df_Tampones_Filtrado_ALC$Precio / df_Tampones_Filtrado_ALC$Unidades, digits = 2)
+```
+
+Now, just as we did with the pads, we'll merge both tables into **one dataset**, adjusting the order and adding a new column indicating where the tampons can be purchased:
+
+```{r}
+df_Tampones_Filtrado_ALC$Supermercado <- "Alcampo"
+df_Tampones_Filtrado$Supermercado <- "DIA"
+
+# Combinar los dataframes en uno solo
+df_combinado_tampones <- bind_rows(df_Tampones_Filtrado_ALC, df_Tampones_Filtrado)
+```
+
+```{r}
+
+# New order
+order_columns_tampones <- c("Supermercado", "Marca", "Tipo_Marca","Unidades", "Precio", "Precio_por_unidad", "Tipo")
+
+# Select columns
+df_combinado_tampones <- select(df_combinado_tampones, order_columns_tampones)
+df_combinado_tampones
+
+```
+
+## 3.2. ANALYSIS
+
+```{r}
+df_combinado_compresas
+```
+
+```{r}
+df_combinado_tampones
+
+```
+
+Detailed analysis of the data provided offers in-depth insight into the market for menstrual products in supermarkets, focusing on pricing, brands, supply and market strategies. This research seeks to identify significant patterns, relationships and trends to inform strategic decisions in the retail sector.
+
+-   **Price of the cheapest tampons and pads:**
+
+The **cheapest tampons** were found in the own brand "**ALCAMPO White Brand**" in Alcampo, with a minimum price of €1.00 for 4 units. The cheapest pads were also found in the same brand and supermarket, with a minimum price of €1.00 for 10 pads.
+
+The **cheapest sanitary towels** were found in the own brand "**ALCAMPO White Brand**" in Alcampo, with a minimum price of €1.00 for 10 units. This competitive price may be attractive to consumers looking for economical options and may influence their purchasing decision.
+
+-   **Tampon and pad prices by supermarket:**
+
+Alcampo exhibits greater variability in the prices of tampons and sanitary towels compared to DIA. Prices at Alcampo range from €1.00 to €6.14, while at DIA they range from €3.25 to €6.29.
+
+The average price of tampons at Alcampo is €3.98, while at DIA it is €5.16. For sanitary towels, the average price at Alcampo is €2.64, while at DIA it is €4.45.
+
+-   **Menstrual product offer by supermarket:**
+
+Alcampo offers a wider range of menstrual products, including own and external brands. A total of 30 products were recorded in Alcampo and 10 products in DIA.
+
+The most common brand in Alcampo is "TAMPAX" with 13 products, followed by "ALCAMPO White Brand" with 7 products. At DIA, the most common brand is "Tampax" with 5 products.
+
+-   **Prices of white brands:**
+
+Alcampo's own brands tend to have lower prices compared to external brands. The average unit price of own brands in Alcampo is €0.23 for tampons and €0.14 for sanitary towels, while the average unit price of external brands is €0.20 for tampons and €0.25 for sanitary towels. The fact that the cheapest prices correspond to own brands may indicate an aggressive pricing strategy by both supermarkets to capture the attention of consumers and compete effectively in the menstrual products market.
+
+In this way, supermarkets may be using dynamic pricing strategies to compete in the market for menstrual products. This may include volume discounts, special offers and price adjustments in response to competition and market demand.
+
+-   **Price comparison:**
+
+There is significant variation in the prices of menstrual products depending on pack size and brand type. Larger packs tend to have a lower unit price compared to smaller packs.
+
+The average unit price of large packs (more than 20 units) is €0.19 for tampons and €0.11 for sanitary towels, while the average unit price of small packs (less than 20 units) is €0.25 for tampons and €0.29 for sanitary towels.
+
+-   **Differences between brand types:**
+
+There is a clear distinction between own brands and external brands in terms of pricing. Own brands tend to offer lower prices, which may appeal to price-sensitive consumers. However, external brands may be associated with higher quality or prestige, which may influence the purchasing decisions of some consumers.
+
+# 4. CONCLUSIONS
+
+The detailed analysis provides valuable insights into the market for menstrual products in supermarkets. Alcampo stands out for its broad product offering and competitive pricing, while own brands offer a cost-effective option for consumers. Understanding this type of data can significantly benefit menstruating individuals when shopping at supermarkets, as it provides access to more affordable prices for these products. This accessibility can help alleviate menstrual poverty, making menstrual hygiene products more attainable and reducing the financial burden associated with menstruation.
+
+Despite encountering challenges such as website changes for DIA and the expansion of product offerings at Alcampo, we successfully adapted our code to address these issues. Despite the hurdles, this analysis serves as a valuable tool for comparing menstrual products, aiding menstruating individuals in making informed choices. Moreover, it has the potential to be extended to include more supermarkets, further enriching its impact. By providing access to affordable menstrual products, this work contributes to addressing menstrual poverty and promoting menstrual equity, ultimately benefiting menstruators in need.
+
+# 4. BIBLIOGRAPHY
+
+Molina Gallardo, V. (2021, 28 de octubre). La pandemia destapa la pobreza menstrual: cartones y calcetines en lugar de compresas. El Periódico de España.
